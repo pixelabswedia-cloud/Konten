@@ -17,10 +17,11 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python generate_blog.py
-      - name: Save Changes
+        - name: Save Changes
         run: |
           git config --global user.name "SakaBot"
           git config --global user.email "bot@saka.com"
           git add .
-          git commit -m "Automated post" || exit 0
-          git push
+          git commit -m "Automated post" || echo "No changes to commit"
+          git push origin main
+      
