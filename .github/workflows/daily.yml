@@ -1,27 +1,45 @@
-name: Auto Post
+name: Auto Post AI
+
 on:
   schedule:
-    - cron: '0 0 * * *' # Jalan otomatis jam 7 pagi WIB
-  workflow_dispatch: # Tombol manual
+    - cron: '0 0 * * *' # Berjalan otomatis setiap hari jam 07:00 WIB (00:00 UTC)
+  workflow_dispatch: # Memungkinkan kamu menekan tombol "Run Workflow" secara manual
+
+permissions:
+  contents: write # Memberikan izin robot untuk menulis file ke repositori kamu
+
 jobs:
   post:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - run: pip install google-generativeai
-      - name: Run Script
+
+      - name: Install dependencies
+        run: |
+          pip install -q -U google-generativeai
+
+      - name: Generate Article
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python generate_blog.py
-        - name: Save Changes
+
+      - name: Commit and Push changes
         run: |
-          git config --global user.name "SakaBot"
-          git config --global user.email "bot@saka.com"
+          git config --global user.name "SakaAutoBot"
+          git config --global user.email "bot@sakawebsite.com"
           git add .
-          git commit -m "Automated post" || echo "No changes to commit"
-          git push origin main
-      
+          # Melakukan commit hanya jika ada file baru yang dibuat
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan untuk di-commit."
+          else
+            git commit -m "Automated Blog Post: $(date +'%Y-%m-%d')"
+            git push
+          fi
