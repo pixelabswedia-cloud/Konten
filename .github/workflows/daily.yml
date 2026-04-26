@@ -32,27 +32,9 @@ jobs:
           
           try:
               api_key = os.getenv('GEMINI_API_KEY')
-              if not api_key:
-                  print('Error: API Key tidak ditemukan!')
-                  exit(1)
-              
-              # Gunakan versi v1 (Stabil)
               client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
               
-              # PROSES PENCARIAN MODEL OTOMATIS (Anti-404)
-              print('Mengecek daftar model yang tersedia...')
-              available_models = [m.name for m in client.models.list() if 'generateContent' in m.supported_methods]
-              
-              if not available_models:
-                  print('Error: Tidak ada model yang mendukung generateContent ditemukan!')
-                  exit(1)
-              
-              # Cari model yang ada kata 'flash', jika tidak ada pakai yang pertama
-              selected_model = next((m for m in available_models if 'flash' in m), available_models[0])
-              print(f'Model ditemukan: {available_models}')
-              print(f'Menggunakan model: {selected_model}')
-              
-              # Baca Judul
+              # Cari Judul
               if not os.path.exists('titles.txt'):
                   print('Error: titles.txt tidak ada!')
                   exit(1)
@@ -63,36 +45,48 @@ jobs:
                   exit(0)
               
               topic = lines[0].strip()
-              with open('titles.txt', 'w', encoding='utf-8') as f:
-                  f.writelines(lines[1:])
+              print(f'Memproses judul: {topic}')
+
+              # MENCOBA BEBERAPA VARIASI NAMA MODEL (Mana yang berhasil duluan)
+              content = None
+              # Daftar model potensial di 2026
+              model_list = ['gemini-1.5-flash', 'gemini-1.5-flash-001', 'gemini-2.0-flash-exp']
               
-              print(f'Sedang memproses judul: {topic}')
-              
-              if not os.path.exists('_posts'):
-                  os.makedirs('_posts')
-              
-              # Generate Konten
-              response = client.models.generate_content(
-                  model=selected_model, 
-                  contents=f'Write a professional SEO blog post about {topic} in Markdown format. Use H2 and H3 headings. Start directly with the content.'
-              )
-              
-              if not response.text:
-                  print('Gagal: AI tidak menghasilkan teks.')
+              for model_name in model_list:
+                  try:
+                      print(f'Mencoba model: {model_name}...')
+                      response = client.models.generate_content(
+                          model=model_name, 
+                          contents=f'Write a professional SEO blog post about {topic} in Markdown format. Use H2 and H3 headings. Start directly.'
+                      )
+                      if response.text:
+                          content = response.text
+                          print(f'✅ Berhasil menggunakan {model_name}')
+                          break
+                  except Exception as e:
+                      print(f'Gagal dengan {model_name}, mencoba yang lain...')
+                      continue
+
+              if not content:
+                  print('❌ Semua model gagal merespon.')
                   exit(1)
 
+              # Update titles.txt (Hapus baris pertama setelah berhasil)
+              with open('titles.txt', 'w', encoding='utf-8') as f:
+                  f.writelines(lines[1:])
+
               # Simpan File
+              if not os.path.exists('_posts'): os.makedirs('_posts')
               date_str = datetime.datetime.now().strftime('%Y-%m-%d')
               safe_title = topic.lower().replace(' ', '-').replace('?', '').replace('!', '').replace(':', '')
               filename = f'_posts/{date_str}-{safe_title}.md'
               
               with open(filename, 'w', encoding='utf-8') as f:
-                  f.write(response.text)
-              
-              print(f'✅ Berhasil! File dibuat: {filename}')
+                  f.write(content)
+              print(f'✅ File mendarat di: {filename}')
               
           except Exception as e:
-              print(f'❌ Terjadi kesalahan fatal: {e}')
+              print(f'❌ Terjadi kesalahan: {e}')
               exit(1)
           "
 
