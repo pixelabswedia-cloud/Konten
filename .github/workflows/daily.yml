@@ -19,23 +19,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Google AI
-        run: pip install -U google-generativeai
+      - name: Install New Google GenAI Library
+        run: pip install -U google-genai  # Library versi terbaru
 
       - name: Generate and Save Article
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python -c "
-          import os, google.generativeai as genai, datetime
+          import os, datetime
+          from google import genai
           
-          # Setup API
+          # Setup Client Baru
           api_key = os.getenv('GEMINI_API_KEY')
-          genai.configure(api_key=api_key)
-          
-          # Gunakan model yang paling standar
-          model_name = 'models/gemini-1.5-flash'
-          model = genai.GenerativeModel(model_name)
+          client = genai.Client(api_key=api_key)
           
           # Baca Judul
           if not os.path.exists('titles.txt'):
@@ -57,9 +54,14 @@ jobs:
           if not os.path.exists('_posts'):
               os.makedirs('_posts')
           
-          # Generate Konten dengan Error Handling
+          # Generate Konten dengan SDK Terbaru
           try:
-              response = model.generate_content(f'Write a pro blog post about {topic} in Markdown. Use H2 and H3. Start directly.')
+              # Model gemini-1.5-flash adalah yang paling stabil dan cepat
+              response = client.models.generate_content(
+                  model='gemini-1.5-flash', 
+                  contents=f'Write a pro blog post about {topic} in Markdown format. Use H2 and H3 headings. Do not use conversational intro, start directly with content.'
+              )
+              
               content = response.text
               
               # Nama File
