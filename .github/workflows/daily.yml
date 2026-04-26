@@ -32,72 +32,82 @@ jobs:
           
           try:
               api_key = os.getenv('GEMINI_API_KEY')
+              if not api_key:
+                  print('Error: API Key tidak ditemukan di Secrets!')
+                  exit(1)
+              
+              # Gunakan API versi v1 (Stabil)
               client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
               
-              # Cari Judul
+              # 1. Baca Judul
               if not os.path.exists('titles.txt'):
-                  print('Error: titles.txt tidak ada!')
+                  print('Error: titles.txt tidak ditemukan!')
                   exit(1)
+                  
               with open('titles.txt', 'r', encoding='utf-8') as f:
                   lines = f.readlines()
+                  
               if not lines:
-                  print('Info: titles.txt kosong.')
+                  print('Info: titles.txt kosong, selesai.')
                   exit(0)
               
               topic = lines[0].strip()
-              print(f'Memproses judul: {topic}')
+              print(f'Mencoba memproses judul: {topic}')
 
-              # MENCOBA BEBERAPA VARIASI NAMA MODEL (Mana yang berhasil duluan)
+              # 2. Sistem Cadangan Model (Coba satu per satu)
               content = None
-              # Daftar model potensial di 2026
-              model_list = ['gemini-1.5-flash', 'gemini-1.5-flash-001', 'gemini-2.0-flash-exp']
+              model_list = ['gemini-1.5-flash', 'gemini-1.5-flash-001', 'gemini-2.0-flash-exp', 'gemini-pro']
               
               for model_name in model_list:
                   try:
-                      print(f'Mencoba model: {model_name}...')
+                      print(f'Sedang mencoba model: {model_name}...')
                       response = client.models.generate_content(
                           model=model_name, 
-                          contents=f'Write a professional SEO blog post about {topic} in Markdown format. Use H2 and H3 headings. Start directly.'
+                          contents=f'Write a professional SEO blog post about {topic} in English. Use Markdown format with H2 and H3 headings. Do not include intro or outro, start directly with the content.'
                       )
                       if response.text:
                           content = response.text
-                          print(f'✅ Berhasil menggunakan {model_name}')
+                          print(f'✅ Berhasil menggunakan model: {model_name}')
                           break
                   except Exception as e:
-                      print(f'Gagal dengan {model_name}, mencoba yang lain...')
+                      print(f'Gagal dengan {model_name}: {e}')
                       continue
 
               if not content:
-                  print('❌ Semua model gagal merespon.')
+                  print('❌ Semua model gagal merespon. Cek API Key atau kuota kamu.')
                   exit(1)
 
-              # Update titles.txt (Hapus baris pertama setelah berhasil)
+              # 3. Update titles.txt (Hapus judul yang sudah sukses)
               with open('titles.txt', 'w', encoding='utf-8') as f:
                   f.writelines(lines[1:])
 
-              # Simpan File
-              if not os.path.exists('_posts'): os.makedirs('_posts')
+              # 4. Pastikan folder _posts ada dan simpan file
+              if not os.path.exists('_posts'):
+                  os.makedirs('_posts')
+                  
               date_str = datetime.datetime.now().strftime('%Y-%m-%d')
-              safe_title = topic.lower().replace(' ', '-').replace('?', '').replace('!', '').replace(':', '')
-              filename = f'_posts/{date_str}-{safe_title}.md'
+              # Bersihkan judul untuk nama file
+              clean_title = topic.lower().replace(' ', '-').replace('?', '').replace('!', '').replace(':', '')
+              filename = f'_posts/{date_str}-{clean_title}.md'
               
               with open(filename, 'w', encoding='utf-8') as f:
                   f.write(content)
-              print(f'✅ File mendarat di: {filename}')
+              
+              print(f'✅ FILE SUKSES DIBUAT: {filename}')
               
           except Exception as e:
-              print(f'❌ Terjadi kesalahan: {e}')
+              print(f'❌ Terjadi kesalahan sistem: {e}')
               exit(1)
           "
 
-      - name: Commit and Push
+      - name: Commit and Push to GitHub
         run: |
           git config --global user.name "SakaAutoBot"
           git config --global user.email "bot@sakawebsite.com"
           git add _posts/*.md
           git add titles.txt
           if git diff --staged --quiet; then
-            echo "Tidak ada perubahan."
+            echo "Tidak ada perubahan untuk di-commit."
           else
             git commit -m "Automated post: $(date +'%Y-%m-%d')"
             git push origin main
